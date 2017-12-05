@@ -8,6 +8,7 @@
 
 #import "ConfigManager.h"
 #import "Common.h"
+#import <UIKit/UIKit.h>
 
 NSString *_currentConfigDirectory = nil;
 

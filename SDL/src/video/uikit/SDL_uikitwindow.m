@@ -83,33 +83,51 @@ static int SetupWindowData(_THIS, SDL_Window *window, UIWindow *uiwindow, SDL_bo
 }
 
 int UIKit_CreateWindow(_THIS, SDL_Window *window) {
+    
+    __block int result = 1;
+    
+    dispatch_block_t createWindowBlock = ^{
         
-    /* We currently only handle single window applications on iPhone */
+        /* We currently only handle single window applications on iPhone */
 #ifndef IPHONEOS
-    if (nil != [SDLUIKitDelegate sharedAppDelegate].window) {
-        SDL_SetError("Window already exists, no multi-window support.");
-        return -1;
-    }
-    
-    /* ignore the size user requested, and make a fullscreen window */
-
-    UIWindow *uiwindow = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+        if (nil != [SDLUIKitDelegate sharedAppDelegate].window) {
+            SDL_SetError("Window already exists, no multi-window support.");
+            result = -1;
+            return;
+        }
+        
+        /* ignore the size user requested, and make a fullscreen window */
+        
+        UIWindow *uiwindow = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
 #else
-    UIWindow *uiwindow = (UIWindow*)[SDLUIKitDelegate sharedAppDelegate].uiwindow;
+        UIWindow *uiwindow = (UIWindow*)[SDLUIKitDelegate sharedAppDelegate].uiwindow;
 #endif
-    if (SetupWindowData(_this, window, uiwindow, SDL_TRUE) < 0) {
-        [uiwindow release];
-        return -1;
-    }    
-    
-    // This saves the main window in the app delegate so event callbacks can do stuff on the window.
-    // This assumes a single window application design and needs to be fixed for multiple windows.
-    [SDLUIKitDelegate sharedAppDelegate].window = window;
+        if (SetupWindowData(_this, window, uiwindow, SDL_TRUE) < 0) {
+            [uiwindow release];
+            result = -1;
+            return;
+        }
+        
+        // This saves the main window in the app delegate so event callbacks can do stuff on the window.
+        // This assumes a single window application design and needs to be fixed for multiple windows.
+        [SDLUIKitDelegate sharedAppDelegate].window = window;
 #ifndef IPHONEOS
-    [SDLUIKitDelegate sharedAppDelegate].uiwindow = uiwindow;
-    [uiwindow release]; /* release the window (the app delegate has retained it) */
+        [SDLUIKitDelegate sharedAppDelegate].uiwindow = uiwindow;
+        [uiwindow release]; /* release the window (the app delegate has retained it) */
 #endif
-    return 1;
+    };
+    
+    if (NSThread.isMainThread)
+    {
+        createWindowBlock();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), createWindowBlock);
+    }
+
+    
+    return result;
     
 }
 
@@ -122,19 +140,46 @@ void UIKit_DestroyWindow(_THIS, SDL_Window * window) {
     }
 
     /* this will also destroy the window */
-    [SDLUIKitDelegate sharedAppDelegate].window = NULL;
-    [SDLUIKitDelegate sharedAppDelegate].uiwindow = nil;
+    dispatch_block_t destroyWindowBlock = ^{
+        [SDLUIKitDelegate sharedAppDelegate].window = NULL;
+        [SDLUIKitDelegate sharedAppDelegate].uiwindow = nil;
+    };
+    if (NSThread.isMainThread)
+    {
+        destroyWindowBlock();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), destroyWindowBlock);
+    }
+
 }
 
 #ifdef IPHONEOS
 void UIKit_SetWindowSize(_THIS, SDL_Window * window) {
     SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     if (data && data->view) {
-        [data->view resize:CGSizeMake(window->w, window->h)];
+        if (NSThread.isMainThread)
+        {
+            [data->view resize:CGSizeMake(window->w, window->h)];
+
+        }
+        else
+        {
+            dispatch_sync(dispatch_get_main_queue(), ^{  [data->view resize:CGSizeMake(window->w, window->h)]; });
+        }
     }
 }
 void UIKit_SetWindowTitle(_THIS, SDL_Window * window) {
-    [[SDLUIKitDelegate sharedAppDelegate] setWindowTitle:window->title];
+    if (NSThread.isMainThread)
+    {
+        [[SDLUIKitDelegate sharedAppDelegate] setWindowTitle:window->title];
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), ^{ [[SDLUIKitDelegate sharedAppDelegate] setWindowTitle:window->title]; });
+    }
+
 }
 #endif
 

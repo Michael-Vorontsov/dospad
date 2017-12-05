@@ -270,10 +270,17 @@
     
     newSize = sizeNew;
     resizeDone = FALSE;
-    [self performSelectorOnMainThread:@selector(resizeMain) withObject:nil waitUntilDone:YES];
-    while (!resizeDone) {
-        [NSThread sleepForTimeInterval:0.1];
+    if (NSThread.isMainThread)
+    {
+        [self resizeMain];
     }
+    else
+    {
+        [self performSelectorOnMainThread:@selector(resizeMain) withObject:nil waitUntilDone:YES];
+    }
+//    while (!resizeDone) {
+//        [NSThread sleepForTimeInterval:0.1];
+//    }
     return YES;
 }
 
@@ -328,8 +335,8 @@
     
     
     [self erase];
-    resizeDone = YES;
 #endif
+    resizeDone = YES;
 }
 
 - (void)destroyFramebuffer {

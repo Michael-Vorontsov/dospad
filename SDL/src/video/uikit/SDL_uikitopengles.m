@@ -81,10 +81,21 @@ void UIKit_GL_SwapWindow(_THIS, SDL_Window * window)
 	if (data == 0 || nil == data->view) {
 		return;
 	}
-	[data->view swapBuffers];
-	/* since now we've got something to draw
-	   make the window visible */
-	[data->uiwindow makeKeyAndVisible];
+    dispatch_block_t swapBufferBlock = ^{
+        [data->view swapBuffers];
+        /* since now we've got something to draw
+         make the window visible */
+        [data->uiwindow makeKeyAndVisible];
+    };
+    
+    if (NSThread.isMainThread)
+    {
+        swapBufferBlock();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), swapBufferBlock);
+    }
 
 	/* we need to let the event cycle run, or the OS won't update the OpenGL view! */
 	SDL_PumpEvents();
@@ -93,7 +104,7 @@ void UIKit_GL_SwapWindow(_THIS, SDL_Window * window)
 SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
 {
 	
-	SDL_uikitopenglview *view;
+	__block SDL_uikitopenglview *view;
 
 	SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
 #ifndef IPHONEOS
@@ -106,8 +117,19 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
 									aBits: _this->gl_config.alpha_size \
 									depthBits: _this->gl_config.depth_size];
 #else
-    view = [[SDLUIKitDelegate sharedAppDelegate] screen];
-    [view resize:CGSizeMake(window->w, window->h)];
+     dispatch_block_t setupViewBlock = ^{
+         view = [[SDLUIKitDelegate sharedAppDelegate] screen];
+        [view resize:CGSizeMake(window->w, window->h)];
+    };
+    
+    if (NSThread.isMainThread)
+    {
+        setupViewBlock();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), setupViewBlock);
+    }
 #endif
     
     

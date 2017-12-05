@@ -57,7 +57,13 @@
 		[self unzip:srcpath
 			toDir:[[FileSystemObject sharedObject] documentsDirectory]
 		];
+        return;
 	}
+    if ([filename.pathExtension.lowercaseString isEqualToString:@"gzm"]) {
+        [self unzip:srcpath
+              toDir:[[FileSystemObject sharedObject] documentsDirectory]
+         ];
+    }
 }
 
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url
@@ -183,8 +189,7 @@
 	}
 }
 
-
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions 
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
 	[self registerDefaultSettings];
 	[ConfigManager init];
